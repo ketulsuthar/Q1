@@ -160,10 +160,10 @@
 </head>
 
 <body onload="init()" style="background-color: #f0f0f0">
-  <!-- <div class="loading-container">
+  <div class="loading-container">
     <h1>Fetching Covid-19 data</h1>
     <div class="loading"></div>
-  </div> -->
+  </div>
   <div
     style="
       background-color: white;
@@ -479,8 +479,10 @@
         function(topoResponse) {
           topo = topoResponse;
           console.log("Fetched world geojson");
+
+          console.log(topo);
           d3.csv(
-            "https://covid.ourworldindata.org/data/owid-covid-data.csv",
+            "/download/owid-covid-data.csv",
             function(response) {
               // d3.csv("./test-data.csv", function(response) {
               covidData = response;
@@ -519,7 +521,7 @@
                 covidDataByCountryCode[countryCode].push(dataPoint);
               }
               d3.csv(
-                "https://covid.ourworldindata.org/data/latest/owid-covid-latest.csv",
+                "download/owid-covid-latest.csv",
                 response => {
                   latestData = response;
                   console.log("lates :", latestData);

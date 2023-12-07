@@ -1,6 +1,7 @@
 from flask import Flask
 
 from flask_login import LoginManager
+from flask_cors import CORS
 
 from db import db
 from models import User
@@ -8,8 +9,10 @@ from resources.user import auth as auth_blueprint
 from resources.main import main as main_blueprint
 from data import USERS
 
+
 def create_app():
     app = Flask(__name__)
+    CORS(app, origins=["http://127.0.0.1:5004"])
 
     app.config['SECRET_KEY'] = 'secret-key-goes-here'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
