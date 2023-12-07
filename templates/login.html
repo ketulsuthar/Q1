@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8" />
+
+  <!-- Load d3.js -->
+  <script src="https://d3js.org/d3.v4.js"></script>
+  <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+  <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+  <script src="https://unpkg.com/d3fc@14.0.27/build/d3fc.js"></script>
+  <!-- <script src="nest.js"></script>
+  <script src="colors.js"></script>
+  <script src="vaccines.js"></script> -->
+
+  <script src="{{ url_for('static', filename='nest.js') }}"></script>
+  <script src="{{ url_for('static', filename='colors.js') }}"></script>
+  <script src="{{ url_for('static', filename='vaccines.js') }}"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.2/css/bulma.min.css" />
+
+  <style>
+    body {
+      font-family: Roboto, Arial;
+    }
+    #nav {
+      background-color: #eee;
+    }
+    .navitem {
+      cursor: pointer;
+      display: inline-block;
+      padding: 1.5ex;
+    }
+    .navitem:hover {
+      background-color: rgb(8, 69, 148);
+      color: white;
+    }
+    .widget {
+      align-items: stretch;
+      display: flex;
+      flex-direction: row;
+      min-height: 300px;
+      position: relative;
+    }
+    #my_dataviz,
+    #graph,
+    #scatter,
+    #fullyVax,
+    #scatter_deaths,
+    #tests,
+    #vaccines {
+      flex-grow: 2;
+    }
+    #legend,
+    #scatter-legend,
+    #fullyVax-legend,
+    #deaths-legend,
+    #tests-legend,
+    #vaccines-legend {
+      flex-grow: 1;
+      max-height: 300px;
+      overflow-y: scroll;
+      cursor: pointer;
+      max-width: 150px;
+    }
+    #fullyVax-legend {
+      max-width: 200px;
+    }
+    #legend {
+      max-width: 200px;
+    }
+    #tests-legend {
+      max-width: 150px;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+    }
+
+    .login-container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        width: 400px;
+    }
+
+    .login-header {
+        background-color: #3498db;
+        color: #ffffff;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .login-form {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .form-group button {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        background-color: #3498db;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .form-group button:hover {
+        background-color: #2980b9;
+    }
+
+    .notification {
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        padding: 1.25rem 2.5rem 1.25rem 1.5rem;
+        position: relative;
+    }
+    .notification.is-danger {
+        background-color: #ff3860;
+        color: #fff;
+    }
+
+     .notification:not(:last-child) {
+    margin-bottom: 1.5rem;
+    }
+  </style>
+  <script></script>
+</head>
+
+<body style="background-color: #f0f0f0">
+  <div
+    style="
+      background-color: white;
+      max-width: 1350px;
+      margin: auto;
+      padding: 24px;
+    "
+  >
+    <div style="background-color: white" class="scene home">
+      
+        <div class="login-container">
+            <div class="login-header">
+                <h2>Login</h2>
+            </div>
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="notification is-danger">
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+            {% endwith %}
+            <form method="POST" action="/login">
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit">Login</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+  </div>
+</body>

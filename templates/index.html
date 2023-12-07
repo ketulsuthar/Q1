@@ -1,0 +1,2008 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8" />
+
+  <!-- Load d3.js -->
+  <script src="https://d3js.org/d3.v4.js"></script>
+  <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+  <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+  <script src="https://unpkg.com/d3fc@14.0.27/build/d3fc.js"></script>
+  <!-- <script src="nest.js"></script>
+  <script src="colors.js"></script>
+  <script src="vaccines.js"></script> -->
+
+  <script src="{{ url_for('static', filename='nest.js') }}"></script>
+  <script src="{{ url_for('static', filename='colors.js') }}"></script>
+  <script src="{{ url_for('static', filename='vaccines.js') }}"></script>
+
+  <style>
+    body {
+      font-family: Roboto, Arial;
+    }
+    #nav {
+      background-color: #eee;
+    }
+    .navitem {
+      cursor: pointer;
+      display: inline-block;
+      padding: 1.5ex;
+    }
+    .navitem:hover {
+      background-color: rgb(8, 69, 148);
+      color: white;
+    }
+    .widget {
+      align-items: stretch;
+      display: flex;
+      flex-direction: row;
+      min-height: 300px;
+      position: relative;
+    }
+    #my_dataviz,
+    #graph,
+    #scatter,
+    #fullyVax,
+    #scatter_deaths,
+    #tests,
+    #vaccines {
+      flex-grow: 2;
+    }
+    #legend,
+    #scatter-legend,
+    #fullyVax-legend,
+    #deaths-legend,
+    #tests-legend,
+    #vaccines-legend {
+      flex-grow: 1;
+      max-height: 300px;
+      overflow-y: scroll;
+      cursor: pointer;
+      max-width: 150px;
+    }
+    #fullyVax-legend {
+      max-width: 200px;
+    }
+    #legend {
+      max-width: 200px;
+    }
+    #tests-legend {
+      max-width: 150px;
+    }
+    .geo-map {
+      width: 100%;
+      margin: auto;
+      overflow: hidden;
+      position: relative;
+    }
+    .tooltip {
+      position: absolute;
+      z-index: 1070;
+      display: block;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol";
+      font-style: normal;
+      font-weight: 400;
+      line-height: 1.5;
+      text-align: left;
+      text-align: start;
+      text-decoration: none;
+      text-shadow: none;
+      text-transform: none;
+      letter-spacing: normal;
+      word-break: normal;
+      word-spacing: normal;
+      white-space: normal;
+      line-break: auto;
+      font-size: 0.875rem;
+      word-wrap: break-word;
+      opacity: 0;
+    }
+
+    #cases-tooltip {
+      background-color: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.6);
+      border-radius: 10px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 1ex;
+      width: 250px;
+      height: 150px;
+      display: none;
+    }
+    #vaccines-tooltip {
+      background-color: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.6);
+      border-radius: 10px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 1ex;
+      width: 250px;
+      height: 150px;
+      display: none;
+    }
+
+    /*spinner css*/
+    .loading {
+      pointer-events: none;
+      width: 2.5em;
+      height: 2.5em;
+      border: 0.4em solid #eee;
+      border-top-color: #3e67ec;
+      border-radius: 50%;
+      animation: loadingspin 1s linear infinite;
+    }
+    .loading-container {
+      background-color: white;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      justify-content: center;
+      align-items: center;
+    }
+    @keyframes loadingspin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <script></script>
+</head>
+
+<body onload="init()" style="background-color: #f0f0f0">
+  <!-- <div class="loading-container">
+    <h1>Fetching Covid-19 data</h1>
+    <div class="loading"></div>
+  </div> -->
+  <div
+    style="
+      background-color: white;
+      max-width: 1350px;
+      margin: auto;
+      padding: 24px;
+    "
+  >
+    <div id="nav">
+      <div id="nav-home" class="navitem" onclick="navigate('home')">Home</div>
+      <div id="nav-2" class="navitem" onclick="navigate('cases')">
+        New Covid Cases
+      </div>
+      <div id="nav-3" class="navitem" onclick="navigate('vaccination')">
+        Fully Vaccinated Population
+      </div>
+    </div>
+
+    <div style="background-color: white" class="scene home">
+      <h1>The current state of the COVID-19 pandemic</h1>
+      <h2>Satete of the fully vaccinated population around the World</h2>
+
+      <p class="scene home">
+        As the pandemic hit in early 2020, countries raced for medical supplies
+        in order to keep their healthcare workers and populations safe. As time
+        progressed, COVID cases dramatically increased across countries along
+        with deceases, especially in the elderly groups, and people with
+        compromised immune systems and commorbidities.<br />
+      </p>
+
+      <p class="scene home">
+        Societies had to adapt and learned quickly to live with a "new normal,"
+        practicing social distance, constant hand washing, and overall,
+        experienced strict lock downs in order to avoid the collapse of health
+        systems, as the Number of COVID cases quickly increased across
+        countries.<br />
+      </p>
+
+      <p class="scene home">
+        No doubt, these have been unprecedented times, and as countries design
+        their vaccination strategies, how have countries been affected? how do
+        the numbers compare across nations?<br />
+      </p>
+
+      <p class="scene home">
+        Find out what's the percentage of the fully vaccinated population in
+        your area in the heat map below!<br />
+      </p>
+
+      <div class="geo-map" style="width: 800px; margin: auto">
+        <svg id="my_dataviz" width="800" height="500"></svg>
+      </div>
+      <div style="text-align: right;">
+        <span
+          class="navitem"
+          onclick="navigate('cases')"
+          style="background-color: rgb(8, 69, 148); color: white;"
+          >Next
+        </span>
+      </div>
+    </div>
+
+    <div style="background-color: white" class="scene cases">
+      <h1>New COVID Cases</h1>
+      <p class="scene cases">
+        As vaccinations efforts continue across countries, COVID cases continue
+        to increase, and even though not in the same proportion, some nations
+        have experienced case waves, mostly fuelled by the presence of COVID
+        variants such as Alpha, Beta, Gamma and Delta, which are the ones of
+        most concerned by the World Health Organization.<br />
+      </p>
+
+      <p class="scene cases">
+        Andorra, and Malta, for instance, have experienced similar situations,
+        as their new COVID cases have increases very similarly in the last
+        fifteen days. Click/Unclick in the names of the countries you'd like to
+        compare in the chart below! You can also see the trends in their COVID
+        testing efforts.<br />
+      </p>
+
+      <div style="background-color: white">
+        <div class="widget cases">
+          <div id="graph"></div>
+          <div id="legend"></div>
+        </div>
+      </div>
+
+      <h1>COVID-19 tests and their impact on deceases</h1>
+      <p class="scene cases">
+        Testing is a crucial factor in any public health strategy. It was
+        critical early on in the case of the COVID pandemic in order to avoid
+        not only the collapse of the public health systems, but to reduce the
+        spread of the virus within the same households.<br />
+      </p>
+
+      <p class="scene cases">
+        See the trend for each country in the chart below, along with the
+        magnitude of diseases.<br />
+      </p>
+
+      <div>
+        <div
+          style="
+            display: inline-block;
+            width: 49%;
+            margin: auto;
+            background-color: white;
+          "
+        >
+          <div class="widget cases">
+            <div id="tests"></div>
+            <div id="tests-legend"></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            display: inline-block;
+            width: 49%;
+            margin: auto;
+            background-color: white;
+          "
+        >
+          <div class="widget cases">
+            <div id="scatter_deaths"></div>
+            <div id="deaths-legend"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: left;">
+        <span
+          class="navitem"
+          onclick="navigate('home')"
+          style="background-color: rgb(8, 69, 148); color: white;"
+          >&larr; Previous</span
+        >
+
+        <span
+          class="navitem"
+          onclick="navigate('vaccination')"
+          style="float: right; background-color: rgb(8, 69, 148); color: white;"
+          >Next &rarr;</span
+        >
+      </div>
+    </div>
+
+    <div style="background-color: white" class="scene vaccination">
+      <h1>Fully Vaccinated Population</h1>
+      <p class="scene vaccination">
+        As vaccination efforts continue, quite a few countries have achieved
+        important results to immunize their populations against COVID. Malta,
+        UAE, Iceland, and Chile, for instance, have achieved between 64% and 70%
+        of their population fully vaccinated.<br />
+      </p>
+
+      <p class="scene vaccination">
+        Click/Unclick in the countries below to compare how countries trend in
+        their vaccination efforts.<br />
+      </p>
+
+      <div style="background-color: white">
+        <div class="widget vaccination">
+          <div id="fullyVax"></div>
+          <div id="fullyVax-legend"></div>
+        </div>
+      </div>
+      <h1>COVID cases and how it relates to poverty</h1>
+      <p class="scene vaccination">
+        Even though countries started their vaccionation efforts early in the
+        year, some regions continue to struggle in their vaccination
+        acquisition. Vaccine manufacturers faced logistic and production issues,
+        however, once they were fixed, access to vaccines has been a challenge
+        in lower-middle-income and low-income countries.<br />
+      </p>
+
+      <p class="scene vaccination">
+        Despite the sruggle in the vaccine accessibility, and a high-poverty
+        index, these nations have managed to tame the pandemic, and likely due
+        to their young populations along with the low-level in commorbidity
+        factors.<br />
+      </p>
+      <p class="scene vaccination">
+        We've heard about the main vaccines applied in high-income and
+        upper-middle-income countries. Below is the complete portfolio of
+        vaccines and the number of countries in which they are currently
+        applied. Take a look!<br />
+      </p>
+
+      <div>
+        <div
+          style="
+            display: inline-block;
+            width: 49%;
+            margin: 0;
+            background-color: white;
+          "
+        >
+          <div class="widget vaccination">
+            <div id="scatter"></div>
+            <div id="scatter-legend"></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            display: inline-block;
+            width: 49%;
+            margin: 0;
+            background-color: white;
+          "
+        >
+          <div class="widget vaccination">
+            <div id="vaccines">
+              <div id="vaccines-tooltip">Tooltip</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align: left;">
+        <span
+          class="navitem"
+          onclick="navigate('cases')"
+          style="background-color: rgb(8, 69, 148); color: white;"
+          >&larr; Previous</span
+        >
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function navigate(sceneId) {
+      console.log("Navigating to Scene" + sceneId);
+      let allWidgets = Array.prototype.slice.call(
+        document.getElementsByClassName("scene")
+      );
+      let widgetsForThisScene = [];
+      for (let i = 0; i < allWidgets.length; i++) {
+        let w = allWidgets[i];
+        if (w.classList.contains(sceneId)) {
+          widgetsForThisScene.push(w);
+        }
+      }
+
+      // hide all the widgets first
+      allWidgets.map(function(el) {
+        el.style.display = "none";
+      });
+
+      // then re-show only the widgets we are interested for the scene
+
+      widgetsForThisScene.map(function(el) {
+        el.style.display = "block";
+      });
+    }
+  </script>
+  <script>
+    const margin = { top: 20, right: 20, bottom: 30, left: 60 };
+
+    let svg;
+
+    let mapData;
+    let covidData;
+    let covidDataByCountryCode = {};
+    let dataByDate;
+    let colorScale;
+    let color;
+
+    let countries;
+    let selectedCountryNames = ["United States", "Germany", "Brazil"];
+    // All of these are useful for maps.
+    // This is the data used to draw a world map.
+    let topo;
+    let projection;
+
+    // utility functions
+    const zPadTwo = function(s) {
+      return ("00" + s).slice(-2);
+    };
+    const formatDate = function(date) {
+      return (
+        date.getFullYear() +
+        "-" +
+        zPadTwo(date.getMonth() + 1) +
+        "-" +
+        zPadTwo(date.getDate())
+      );
+    };
+
+    async function init() {
+      // The svg
+      (svg = d3.select("svg")),
+        (width = +svg.attr("width")),
+        (height = +svg.attr("height"));
+
+      // Map and projection
+      var path = d3.geoPath();
+      projection = d3
+        .geoMercator()
+        .scale(70)
+        .center([0, 20])
+        .translate([width / 2, height / 2]);
+
+      // Data and color scale
+      mapData = d3.map();
+      colorScale = d3
+        .scaleThreshold()
+        .domain([0, 10, 20, 30, 40, 50, 60])
+        .range(d3.schemeBlues[7]);
+
+      d3.json(
+        "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson",
+        function(topoResponse) {
+          topo = topoResponse;
+          console.log("Fetched world geojson");
+          d3.csv(
+            "https://covid.ourworldindata.org/data/owid-covid-data.csv",
+            function(response) {
+              // d3.csv("./test-data.csv", function(response) {
+              covidData = response;
+              dataByDate = {};
+              for (let datum of covidData) {
+                const date = datum.date;
+                if (!(date in dataByDate)) {
+                  dataByDate[date] = [];
+                }
+                dataByDate[date].push(datum);
+              }
+              countries = d3
+                .nest()
+                .key(function(d) {
+                  return d.location;
+                })
+                .entries(covidData);
+
+              let country_color = countries.map(function(d) {
+                return d.key;
+              });
+
+              color = d3
+                .scaleOrdinal()
+                .domain(country_color)
+                .range(COLORS);
+
+              console.log("Fetched Covid Data");
+              for (let dataPoint of covidData) {
+                const countryCode = dataPoint.iso_code;
+                // If we don't track this code in the reorganization data, we
+                // need to initialize an empty list.
+                if (!(countryCode in covidDataByCountryCode)) {
+                  covidDataByCountryCode[countryCode] = [];
+                }
+                covidDataByCountryCode[countryCode].push(dataPoint);
+              }
+              d3.csv(
+                "https://covid.ourworldindata.org/data/latest/owid-covid-latest.csv",
+                response => {
+                  latestData = response;
+                  console.log("lates :", latestData);
+
+                  // Draw all the graphs right now.
+                  // TODO: We might want to only draw them when navigating to the
+                  // corresponding scene.
+                  drawMap();
+                  drawMapLegend();
+                  drawNewCovidCases();
+                  drawCovidCasesLegend();
+                  drawScatterDeaths();
+                  // drawScatterDeathsLegend();
+                  drawTests();
+                  drawTestLegend();
+                  drawPovertyScatterPlot();
+                  drawPovertyScatterLegend();
+                  drawFullyVaccinatedLegend();
+                  drawFullyVaccinated();
+                  drawVaccines();
+                  navigate("home");
+                  d3.select(".loading-container").remove();
+                  // document.getElementsByClassName("loading").style.display = "none";
+                }
+              );
+              // Draw all the graphs right now.
+              // TODO: We might want to only draw them when navigating to the
+              // corresponding scene.
+              // drawMap();
+              // drawNewCovidCases();
+              // drawScatterDeaths();
+              // drawTests();
+              // drawPovertyScatterPlot();
+              // drawFullyVaccinated();
+              // drawVaccines();
+              // navigate("home");
+              // document.getElementById("loading").style.display = "none";
+            }
+          );
+        }
+      );
+    }
+
+    function drawMapLegend() {
+      const container = d3
+        .select(".geo-map")
+        .append("div")
+        .style("position", "absolute")
+        .style("top", 0);
+
+      container
+        .append("div")
+        .text("Vaccination Percentage / Color")
+        .style("font-size", "10px")
+        .style("transform", "translate(-80px, 80px) rotate(-90deg)");
+
+      const colourScale = colorScale;
+      const domain = colourScale.domain();
+
+      const width = 100;
+      const height = 150;
+
+      const paddedDomain = fc
+        .extentLinear()
+        .pad([0.1, 0.5])
+        .padUnit("percent")(domain);
+      const [min, max] = paddedDomain;
+      const expandedDomain = d3.range(min, max, (max - min) / height);
+
+      const xScale = d3
+        .scaleBand()
+        .domain([0, 1])
+        .range([0, width]);
+
+      const yScale = d3
+        .scaleLinear()
+        .domain(paddedDomain)
+        .range([height, 0]);
+
+      const svgBar = fc
+        .autoBandwidth(fc.seriesSvgBar())
+        .xScale(xScale)
+        .yScale(yScale)
+        .crossValue(0)
+        .baseValue((_, i) => (i > 0 ? expandedDomain[i - 1] : 0))
+        .mainValue(d => d)
+        .decorate(selection => {
+          selection.selectAll("path").style("fill", d => colourScale(d));
+        });
+
+      const axisLabel = fc
+        .axisRight(yScale)
+        .tickValues([...domain, (domain[1] + domain[0]) / 2])
+        .tickSizeOuter(0);
+
+      const legendSvg = container
+        .append("svg")
+        .attr("height", height)
+        .attr("width", width);
+
+      const legendBar = legendSvg
+        .append("g")
+        .datum(expandedDomain)
+        .call(svgBar);
+
+      legendSvg
+        .append("g")
+        .attr("transform", `translate(30)`)
+        .datum(expandedDomain)
+        .call(axisLabel)
+        .select(".domain")
+        .attr("visibility", "hidden");
+
+      container.style("margin", "1em");
+    }
+    function drawMap() {
+      let Tooltip = d3
+        .select(".geo-map")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("z-index", "10")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      var mouseover = function(d) {
+        Tooltip.style("opacity", 1);
+        d3.select(this)
+          .style("stroke", "black")
+          .style("opacity", 1);
+      };
+      var mousemove = function(d) {
+        let countryData = latestData.find(el => el.iso_code === d.id);
+        Tooltip.html(
+          `Percentage of fully vaccinated in ${countryData.location}: ${(
+            (countryData.people_fully_vaccinated / countryData.population) *
+            100
+          ).toFixed(2)}%`
+        )
+          .style("left", d3.mouse(this)[0] + "px")
+          .style("top", d3.mouse(this)[1] + 140 + "px");
+      };
+      var mouseleave = function(d) {
+        Tooltip.style("opacity", 0);
+        d3.select(this)
+          .style("stroke", "none")
+          .style("opacity", 0.8);
+      };
+      // Draw the map
+      svg
+        .call(
+          d3.zoom().on("zoom", function() {
+            svg.attr("transform", d3.event.transform);
+          })
+        )
+        .append("g")
+        .selectAll("path")
+        .data(topo.features)
+        .enter()
+        .append("path")
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave)
+        .on("click", function(obj) {
+          console.log(obj.id + ": " + obj.total);
+        })
+        // draw each country
+        .attr("d", d3.geoPath().projection(projection))
+        // set the color of each country
+        .attr("fill", function(country) {
+          // First, check that we have ANY data about this country.
+          let countryData = latestData.find(el => {
+            if (
+              el.location === country.properties.name ||
+              el.iso_code === country.id
+            ) {
+              return true;
+            }
+            return false;
+          });
+          if (!countryData) {
+            return colorScale(0);
+          }
+          return colorScale(
+            (countryData.people_fully_vaccinated / countryData.population) * 100
+          );
+        });
+    }
+
+    function drawCovidCasesLegend() {
+      document.getElementById("legend").innerHTML = "";
+      const legendContainer = d3.select("#legend");
+
+      let legend = legendContainer
+        .append("svg")
+        .attr("height", countries.length * 25 + 12.5);
+
+      // circles are for the bar color chart legend
+
+      legend
+        .selectAll("dots")
+        .data(countries)
+        .enter()
+        .append("g")
+        .append("circle")
+        .attr("cx", 10) // increase to 1000
+        .attr("cy", function(d, i) {
+          return i * 25 + 25;
+        })
+        .attr("r", 3)
+        .style("fill", function(d) {
+          return color(d.key);
+        });
+
+      // this part is to insert the country labels
+      legend
+        .selectAll("labels")
+        .data(countries)
+        .enter()
+        .append("text")
+        .attr("x", 20) // How seperate the legend is from the text
+        .attr("y", function(d, i) {
+          return i * 25 + 30;
+        })
+        .on("click", function(countryObj) {
+          // This function is called whenever the user clicks on
+          // the name of a country in the list in the legend.
+          console.log(countryObj.key);
+          if (selectedCountryNames.includes(countryObj.key)) {
+            selectedCountryNames = selectedCountryNames.filter(
+              c => c !== countryObj.key
+            );
+          } else {
+            // We need to change the list of selected countries.
+            selectedCountryNames.push(countryObj.key);
+          }
+          // We don't need to return anything here.
+          console.log(selectedCountryNames);
+          drawNewCovidCases();
+          drawTests();
+          drawScatterDeaths();
+        })
+        .style("fill", function(country) {
+          return color(country.key);
+        })
+        .text(function(country) {
+          return country.key;
+        })
+        .attr("text-anchor", "right")
+        .style("alignment-baseline", "right");
+    }
+
+    function drawNewCovidCases() {
+      // Clear any existing graph and legend first.
+      document.getElementById("graph").innerHTML = "";
+
+      let containerwidth = parseInt(d3.select("#graph").style("width"));
+      let containerheight = parseInt(d3.select("#graph").style("height"));
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let x = d3
+        .scaleTime()
+        .domain(
+          d3.extent(covidData, function(d) {
+            return d3.timeParse("%Y-%m-%d")(d.date);
+          })
+        )
+        .range([0, width]);
+
+      let y = d3
+        .scaleLinear()
+        .domain([
+          0,
+          d3.max(covidData, function(d) {
+            return parseFloat(+d.new_cases_smoothed_per_million);
+          })
+        ])
+        .range([height, 0]);
+
+      let Tooltip = d3
+        .select("#graph")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      const graph = d3
+        .select("#graph")
+        .on("mouseover", function() {
+          Tooltip.style("opacity", 1);
+        })
+        .on("mouseout", function() {
+          Tooltip.style("opacity", 0);
+        });
+
+      const svg = d3
+        .select("#graph")
+        .append("svg")
+        .attr("class", "chart")
+        .attr("width", containerwidth)
+        .attr("height", containerheight);
+
+      function mousemove() {
+        const mouseX = d3.mouse(this)[0];
+        const mouseY = d3.mouse(this)[1];
+        let x0 = x.invert(d3.mouse(this)[0]);
+        let formattedDate = formatDate(x0);
+        let dataForToday = dataByDate[formattedDate];
+        let markup = "<b>" + formattedDate + "</b><br/>";
+        for (let i = 0; i < dataForToday.length; i++) {
+          const datum = dataForToday[i];
+          if (selectedCountryNames.includes(datum.location)) {
+            markup +=
+              "" +
+              datum.location +
+              ": <b>" +
+              datum.new_cases_smoothed_per_million +
+              "</b><br>";
+          }
+        }
+        Tooltip.style("left", mouseX + margin.left + "px")
+          .style("top", mouseY + margin.top + "px")
+          .html(markup);
+      }
+
+      // draw chart
+      svg
+        .append("g")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll(".line-path")
+        .data(countries)
+        .enter()
+        .append("path")
+        .attr("class", "line-path")
+        .attr("fill", "none")
+        .attr("stroke", function(d) {
+          return color(d.key);
+        })
+        .attr("stroke-width", 1.5)
+        .style("display", function(country) {
+          if (selectedCountryNames.includes(country.key)) {
+            return "block";
+          } else {
+            return "none";
+          }
+        })
+        .attr("d", function(d) {
+          return d3
+            .line()
+            .x(function(d) {
+              return x(d3.timeParse("%Y-%m-%d")(d.date));
+            })
+            .y(function(d) {
+              return y(parseFloat(+d.new_cases_smoothed_per_million));
+            })(d.values);
+        });
+
+      svg
+        .append("rect")
+        .attr("width", containerwidth - margin.left - margin.right)
+        .attr("height", containerheight - margin.top - margin.bottom)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mousemove", mousemove);
+
+      // creating label for x axis
+      svg
+        .append("text")
+        .attr("class", "x-label")
+        .attr("text-anchor", "middle")
+        .attr(
+          "transform",
+          "translate(" + width / 2 + " ," + (height + margin.bottom + 18) + ")"
+        )
+        .text("Date");
+
+      // Creatig label for y axis
+      svg
+        .append("text")
+        .attr("class", "y-label")
+        .attr("y", 18)
+        .attr("x", -height / 2)
+        .attr("transform", "rotate(-90)")
+        .style("text-anchor", "middle")
+        .text("New Cases per Million");
+
+      // Adding x & y axes
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5));
+
+      // https://github.com/owid/covid-19-data/blob/master/public/data/README.md
+    }
+
+    // adding scatter deaths
+    function drawScatterDeaths() {
+      //clear any existing graph
+      document.getElementById("scatter_deaths").innerHTML = "";
+      document.getElementById("scatter").innerHTML = "";
+
+      let containerwidth = parseInt(
+        d3.select("#scatter_deaths").style("width")
+      );
+      let containerheight = parseInt(
+        d3.select("#scatter_deaths").style("height")
+      );
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let valueToDateDeathsCountries = {};
+      let valueToDateCasesCountries = {};
+      let colorPerCountry = {};
+      let namePerCountry = {};
+      for (let dataPoint of covidData) {
+        const countryCode = dataPoint.iso_code;
+        // Always overwrite the current value of total_cases with the new one.
+        if ("total_deaths" in dataPoint && !!dataPoint["total_deaths"]) {
+          valueToDateDeathsCountries[countryCode] = parseFloat(
+            dataPoint.total_deaths
+          );
+        }
+        if ("total_cases" in dataPoint && !!dataPoint["total_cases"]) {
+          valueToDateCasesCountries[countryCode] = parseFloat(
+            dataPoint.total_cases
+          );
+          colorPerCountry[countryCode] = color(dataPoint.location);
+        }
+        if ("location" in dataPoint && !!dataPoint["location"]) {
+          namePerCountry[countryCode] = dataPoint.location;
+        }
+      }
+
+      let casesToDeaths = [];
+      for (let code of Object.keys(valueToDateDeathsCountries)) {
+        casesToDeaths.push({
+          deaths: valueToDateDeathsCountries[code],
+          cases: valueToDateCasesCountries[code],
+          color: colorPerCountry[code],
+          key: namePerCountry[code]
+        });
+      }
+
+      let xmin = d3.min(covidData, function(d) {
+        return parseFloat(d["total_deaths"]) || Number.MAX_SAFE_INTEGER;
+      });
+
+      let xmax = d3.max(covidData, function(d) {
+        return parseFloat(d["total_deaths"]) || 0;
+      });
+
+      let ymin = d3.min(covidData, function(d) {
+        return parseFloat(d["total_cases"]) || Number.MAX_SAFE_INTEGER;
+      });
+
+      let ymax = d3.max(covidData, function(d) {
+        return parseFloat(d["total_cases"]) || 0;
+      });
+
+      xmin = Math.max(xmin, 0);
+
+      // The above statement is the same as doing:
+      // if (xmin < 0) {
+      // xmin = 0;
+      // }
+
+      let x = d3
+        .scaleLog()
+        .domain([xmin, xmax])
+        .range([0, width]);
+
+      let y = d3
+        .scaleLog()
+        .domain([ymin, ymax])
+        .range([height, 0]);
+
+      let Tooltip = d3
+        .select("#scatter_deaths")
+        .append("div")
+        .style("opacity", 1)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      function mousemove(d) {
+        Tooltip.html(`${d.key}<br>Deaths: ${d.deaths}<br>New cases: ${d.cases}`)
+          .style("left", d3.mouse(this)[0] + "px")
+          .style("top", d3.mouse(this)[1] + 50 + "px");
+      }
+
+      const svg = d3
+        .select("#scatter_deaths")
+        .append("svg")
+        .attr("class", "chart")
+        .attr("width", containerwidth)
+        .attr("height", containerheight);
+
+      // Draw the actual chart
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll("circle")
+        .data(casesToDeaths)
+        .enter()
+        .append("circle")
+        .on("mousemove", mousemove)
+        .on("mouseover", function() {
+          Tooltip.style("opacity", 1);
+          d3.select(this)
+            .style("stroke", "black")
+            .style("opacity", 1);
+        })
+        .on("mouseout", function() {
+          Tooltip.style("opacity", 0);
+          d3.select(this)
+            .style("stroke", "none")
+            .style("opacity", 0.8);
+        })
+        .attr("stroke", function(d) {
+          // console.log('example d :', d)
+          if (selectedCountryNames.includes(d.key)) {
+            return "black";
+          }
+          return "none";
+        })
+        .attr("stroke-width", 1.5)
+        .attr("cx", function(d) {
+          return x(parseFloat(+d.deaths));
+        })
+        .attr("cy", function(d) {
+          return y(parseFloat(+d.cases));
+        })
+        .style("fill", function(d) {
+          return color(d.color);
+        })
+        .attr("r", function(dot) {
+          return Math.log(parseFloat(dot.cases));
+        });
+
+      // creating label for x axis
+      svg
+        .append("text")
+        .attr("class", "x-label")
+        .attr("text-anchor", "middle")
+        .attr(
+          "transform",
+          "translate(" + width / 2 + " ," + (height + margin.bottom + 18) + ")"
+        )
+        .text("Total Deaths");
+
+      // Creatig label for y axis
+      svg
+        .append("text")
+        .attr("class", "y-label")
+        .attr("y", 18)
+        .attr("x", -height / 2)
+        .attr("transform", "rotate(-90)")
+        .style("text-anchor", "middle")
+        .text("Total Cases");
+
+      // Adding x & y axes
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5));
+
+      const legendContainer = d3.select("#deaths-legend");
+
+      let legend = legendContainer
+        .append("svg")
+        .attr("height", countries.length * 25 + 12.5);
+
+      // circles are for the bar color chart legend
+      legend
+        .selectAll("dots")
+        .data(countries)
+        .enter()
+        .append("g")
+        .append("circle")
+        .attr("cx", 10) // increase to 1000
+        .attr("cy", function(d, i) {
+          return i * 25 + 25;
+        })
+        .attr("r", 3)
+        .style("fill", function(d) {
+          return color(d.key);
+        });
+
+      // this part is to insert the country labels
+      legend
+        .selectAll("labels")
+        .data(countries)
+        .enter()
+        .append("text")
+        .on("click", function(countryObj) {
+          // This function is called whenever the user clicks on
+          // the name of a country in the list in the legend.
+          console.log(countryObj.key);
+          // We need to change the list of selected countries.
+          selectedCountryNames.push(countryObj.key);
+
+          console.log(selectedCountryNames);
+          drawTests();
+          drawScatterDeaths();
+          drawNewCovidCases();
+        })
+        .attr("x", 20) // How seperate the legend is from the text
+        .attr("y", function(d, i) {
+          return i * 25 + 30;
+        })
+        .style("fill", function(d) {
+          return color(d.key);
+        })
+        .text(function(d) {
+          return d.key;
+        })
+
+        .attr("text-anchor", "right")
+        .style("alignment-baseline", "right");
+    }
+
+    // total tests
+
+    function drawTestLegend() {
+      document.getElementById("tests-legend").innerHTML = "";
+      const legendContainer = d3.select("#tests-legend");
+
+      let legend = legendContainer
+        .append("svg")
+        .attr("height", countries.length * 25 + 12.5);
+
+      legend
+        .selectAll("dots")
+        .data(countries)
+        .enter()
+        .append("g")
+        .append("circle")
+        .attr("cx", 10) // increase to 1000
+        .attr("cy", function(d, i) {
+          return i * 25 + 25;
+        })
+        .attr("r", 3)
+        .style("fill", function(d) {
+          return color(d.key);
+        });
+
+      legend
+        .selectAll("labels")
+        .data(countries)
+        .enter()
+        .append("text")
+        .attr("x", 20) // How seperate the legend is from the text
+        .attr("y", function(d, i) {
+          return i * 25 + 30;
+        })
+        .on("click", function(countryObj) {
+          // This function is called whenever the user clicks on
+          // the name of a country in the list in the legend.
+          console.log(countryObj.key);
+          // We need to change the list of selected countries.
+          selectedCountryNames.push(countryObj.key);
+
+          console.log(selectedCountryNames);
+          drawTests();
+          drawScatterDeaths();
+          drawNewCovidCases();
+        })
+        .style("fill", function(country) {
+          return color(country.key);
+        })
+        .text(function(country) {
+          return country.key;
+        })
+        .attr("text-anchor", "right")
+        .style("alignment-baseline", "right");
+    }
+
+    function drawTests() {
+      document.getElementById("tests").innerHTML = "";
+
+      let containerwidth = parseInt(d3.select("#tests").style("width"));
+      let containerheight = parseInt(d3.select("#tests").style("height"));
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let x = d3
+        .scaleTime()
+        .domain(
+          d3.extent(covidData, function(d) {
+            return d3.timeParse("%Y-%m-%d")(d.date);
+          })
+        )
+        .range([0, width]);
+
+      let y = d3
+        .scaleLog()
+        .clamp(true)
+        .domain([
+          0.1,
+          d3.max(covidData, function(d) {
+            return parseFloat(+d.total_tests);
+          })
+        ])
+        .range([height, 0])
+        .nice();
+
+      let Tooltip = d3
+        .select("#tests")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      function mousemove(d) {
+        console.log("d:", d);
+        const mouseX = d3.mouse(this)[0];
+        const mouseY = d3.mouse(this)[1];
+        let x0 = x.invert(d3.mouse(this)[0]);
+        let formattedDate = formatDate(x0);
+        let dataForToday = dataByDate[formattedDate];
+        let markup = "<b>" + formattedDate + "</b><br/>";
+        for (let i = 0; i < dataForToday.length; i++) {
+          const datum = dataForToday[i];
+          if (selectedCountryNames.includes(datum.location)) {
+            markup +=
+              "" +
+              datum.location +
+              ": <b>" +
+              datum.new_cases_smoothed_per_million +
+              "</b><br>";
+          }
+        }
+        Tooltip.style("left", mouseX + margin.left + "px")
+          .style("top", mouseY + margin.top + "px")
+          .html(markup);
+      }
+
+      const svg = d3
+        .select("#tests")
+        .append("svg")
+        .attr("class", "chart")
+        .attr("width", containerwidth)
+        .attr("height", containerheight)
+        .on("mouseover", function() {
+          Tooltip.style("opacity", 1);
+        })
+        .on("mouseout", function() {
+          Tooltip.style("opacity", 0);
+        });
+
+      // draw chart
+      svg
+        .append("g")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll(".line-path")
+        .data(countries)
+        .enter()
+        .append("path")
+        .on("mousemove", mousemove)
+        .attr("class", "line-path")
+        .attr("fill", "none")
+        .attr("stroke", function(d) {
+          return color(d.key);
+        })
+        .attr("stroke-width", 1.5)
+        .style("display", function(country) {
+          if (selectedCountryNames.includes(country.key)) {
+            return "block";
+          } else {
+            return "none";
+          }
+        })
+        .attr("d", function(d) {
+          return d3
+            .line()
+            .x(function(d) {
+              return x(d3.timeParse("%Y-%m-%d")(d.date));
+            })
+            .y(function(d) {
+              return y(parseFloat(+d.total_tests));
+            })(d.values);
+        });
+
+      // creating label for x axis
+      svg
+        .append("text")
+        .attr("class", "x-label")
+        .attr("text-anchor", "middle")
+        .attr(
+          "transform",
+          "translate(" + width / 2 + " ," + (height + margin.bottom + 18) + ")"
+        )
+        .text("Date");
+
+      // Creatig label for y axis
+      svg
+        .append("text")
+        .attr("class", "y-label")
+        .attr("y", 18)
+        .attr("x", -height / 2)
+        .attr("transform", "rotate(-90)")
+        .style("text-anchor", "middle")
+        .text("Total Tests");
+
+      // Adding x & y axes
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y).ticks(10, d3.format(",.1s")));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5));
+    }
+
+    //
+
+    function drawPovertyScatterLegend() {
+      document.getElementById("scatter-legend").innerHTML = "";
+      const legendContainer = d3.select("#scatter-legend");
+
+      let legend = legendContainer
+        .append("svg")
+        .attr("height", countries.length * 25 + 12.5);
+
+      // circles are for the bar color chart legend
+
+      legend
+        .selectAll("dots")
+        .data(countries)
+        .enter()
+        .append("g")
+        .append("circle")
+        .attr("cx", 10) // increase to 1000
+        .attr("cy", function(d, i) {
+          return i * 25 + 25;
+        })
+        .attr("r", 3)
+        .style("fill", function(d) {
+          return color(d.key);
+        });
+
+      // this part is to insert the country labels
+      legend
+        .selectAll("labels")
+        .data(countries)
+        .enter()
+        .append("text")
+        .attr("x", 20) // How seperate the legend is from the text
+        .attr("y", function(d, i) {
+          return i * 25 + 30;
+        })
+        .on("click", function(countryObj) {
+          // This function is called whenever the user clicks on
+          // the name of a country in the list in the legend.
+          console.log(countryObj.key);
+          // We need to change the list of selected countries.
+          if (selectedCountryNames.includes(countryObj.key)) {
+            selectedCountryNames = selectedCountryNames.filter(
+              c => c !== countryObj.key
+            );
+          } else {
+            selectedCountryNames.push(countryObj.key);
+          }
+          console.log(selectedCountryNames);
+          drawPovertyScatterPlot();
+          drawFullyVaccinated();
+        })
+
+        .style("fill", function(d) {
+          return color(d.key);
+        })
+        .text(function(d) {
+          return d.key;
+        })
+        .attr("text-anchor", "right")
+        .style("alignment-baseline", "right");
+    }
+    function drawPovertyScatterPlot() {
+      // Clear any existing graph
+      document.getElementById("scatter").innerHTML = "";
+
+      let containerwidth = parseInt(d3.select("#scatter").style("width"));
+      let containerheight = parseInt(d3.select("#scatter").style("height"));
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let valueToDatePerCountry = {};
+      let extremePovertyPerCountry = {};
+      let colorPerCountry = {};
+      let locationPerCountry = {};
+      for (let dataPoint of covidData) {
+        const countryCode = dataPoint.iso_code;
+        // Always overwrite the current value of total_cases with the new one.
+        if ("total_cases" in dataPoint && !!dataPoint["total_cases"]) {
+          valueToDatePerCountry[countryCode] = parseFloat(
+            dataPoint.total_cases
+          );
+        }
+        // Get the extreme_poverty value if it is present.
+        if ("extreme_poverty" in dataPoint && !!dataPoint["extreme_poverty"]) {
+          extremePovertyPerCountry[countryCode] = parseFloat(
+            dataPoint["extreme_poverty"]
+          );
+          colorPerCountry[countryCode] = color(dataPoint.location);
+        }
+        if ("location" in dataPoint && !!dataPoint["location"]) {
+          locationPerCountry[countryCode] = dataPoint["location"];
+        }
+      }
+
+      let casesToPoverty = [];
+      for (let code of Object.keys(valueToDatePerCountry)) {
+        casesToPoverty.push({
+          cases: valueToDatePerCountry[code],
+          poverty: extremePovertyPerCountry[code],
+          color: colorPerCountry[code],
+          key: locationPerCountry[code]
+        });
+      }
+
+      let xmin = d3.min(covidData, function(d) {
+        return parseFloat(d["total_cases"]) || Number.MAX_SAFE_INTEGER;
+      });
+      let xmax = d3.max(covidData, function(d) {
+        return parseFloat(d["total_cases"]) || 0;
+      });
+      let ymin = d3.min(covidData, function(d) {
+        return parseFloat(d["extreme_poverty"]) || Number.MAX_SAFE_INTEGER;
+      });
+      let ymax = d3.max(covidData, function(d) {
+        return parseFloat(d["extreme_poverty"]) || 0;
+      });
+
+      xmin = Math.max(xmin, 1);
+
+      // The above statement is the same as doing:
+      // if (xmin < 0) {
+      // xmin = 0;
+      // }
+
+      let x = d3
+        .scaleLog()
+        .clamp(true)
+        .domain([xmin, xmax])
+        .range([0, width])
+        .nice();
+
+      let y = d3
+        .scaleLinear()
+        .domain([ymin, ymax])
+        .range([height, 0]);
+
+      let Tooltip = d3
+        .select("#scatter")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      const graph = d3.select("#scatter");
+
+      const svg = d3
+        .select("#scatter")
+        .append("svg")
+        .attr("class", "chart")
+        .attr("width", containerwidth)
+        .attr("height", containerheight);
+
+      let dataByDate = {};
+      for (let datum of covidData) {
+        const date = datum.date;
+        if (!(date in dataByDate)) {
+          dataByDate[date] = [];
+        }
+        dataByDate[date].push(datum);
+      }
+
+      const zPadTwo = function(s) {
+        return ("00" + s).slice(-2);
+      };
+      const formatDate = function(date) {
+        return (
+          date.getFullYear() +
+          "-" +
+          zPadTwo(date.getMonth() + 1) +
+          "-" +
+          zPadTwo(date.getDate())
+        );
+      };
+
+      function mousemove(d) {
+        Tooltip.html(
+          `    ${d.key}<br>Poverty index: ${d.poverty}<br>New cases: ${d.cases}`
+        )
+          .style("left", d3.mouse(this)[0] + "px")
+          .style("top", d3.mouse(this)[1] + 50 + "px");
+      }
+
+      // Draw the actual chart
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll("circle")
+        .data(casesToPoverty)
+        .enter()
+        .append("circle")
+        .on("mousemove", mousemove)
+        .on("mouseover", function() {
+          Tooltip.style("opacity", 1);
+          d3.select(this)
+            .style("stroke", "black")
+            .style("opacity", 1);
+        })
+        .on("mouseout", function() {
+          Tooltip.style("opacity", 0);
+          d3.select(this)
+            .style("stroke", "none")
+            .style("opacity", 0.8);
+        })
+        .attr("cx", function(d) {
+          return x(Math.abs(parseFloat(+d.cases)));
+        })
+        .attr("cy", function(d) {
+          return y(Math.abs(parseFloat(+d.poverty)));
+        })
+        .style("fill", function(d) {
+          return color(d.color);
+        })
+        .attr("stroke", function(d) {
+          // console.log('example d :', d)
+          if (d.key === selectedCountryNames.slice(-1)[0]) {
+            console.log("stroke for selected country : ", d.key);
+            return "black";
+          }
+          return "none";
+        })
+        .attr("stroke-width", 1.5)
+        .attr("r", function(dot) {
+          return 2 + Math.log(parseFloat(dot.poverty));
+        });
+
+      svg
+        .append("rect")
+        .attr("width", containerwidth - margin.left - margin.right)
+        .attr("height", containerheight - margin.top - margin.bottom)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .style("fill", "none");
+      // .style("pointer-events", "all");
+
+      // creating label for x axis
+      svg
+        .append("text")
+        .attr("class", "x-label")
+        .attr("text-anchor", "middle")
+        .attr(
+          "transform",
+          "translate(" + width / 2 + " ," + (height + margin.bottom + 18) + ")"
+        )
+        .text("New cases");
+
+      // Creatig label for y axis
+      svg
+        .append("text")
+        .attr("class", "y-label")
+        .attr("y", 18)
+        .attr("x", -height / 2)
+        .attr("transform", "rotate(-90)")
+        .style("text-anchor", "middle")
+        .text("Extreme Poverty Index");
+
+      // Adding x & y axes
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y).ticks(10, d3.format(",.1s")));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5, d3.format(",.1s")));
+    }
+
+    function drawFullyVaccinatedLegend() {
+      document.getElementById("fullyVax-legend").innerHTML = "";
+      const legendContainer = d3.select("#fullyVax-legend");
+
+      let legend = legendContainer
+        .append("svg")
+        .attr("height", countries.length * 25 + 12.5);
+
+      // circles are for the bar color chart legend
+
+      legend
+        .selectAll("dots")
+        .data(countries)
+        .enter()
+        .append("g")
+        .append("circle")
+        .attr("cx", 10) // increase to 1000
+        .attr("cy", function(d, i) {
+          return i * 25 + 25;
+        })
+        .attr("r", 3)
+        .style("fill", function(d) {
+          return color(d.key);
+        });
+
+      // this part is to insert the country labels
+      legend
+        .selectAll("labels")
+        .data(countries)
+        .enter()
+        .append("text")
+        .attr("x", 20) // How seperate the legend is from the text
+        .attr("y", function(d, i) {
+          return i * 25 + 30;
+        })
+        .on("click", function(d) {
+          console.log("country selected : ", d.key);
+          //adds country selected
+          if (selectedCountryNames.includes(d.key)) {
+            selectedCountryNames = selectedCountryNames.filter(
+              c => c !== d.key
+            );
+          } else {
+            selectedCountryNames.push(d.key);
+          }
+          console.log(selectedCountryNames);
+          drawFullyVaccinated();
+          drawPovertyScatterPlot();
+        })
+        .style("fill", function(d) {
+          return color(d.key);
+        })
+        .text(function(d) {
+          return d.key;
+        })
+        .attr("text-anchor", "right")
+        .style("alignment-baseline", "right");
+    }
+    function drawFullyVaccinated() {
+      // Clear any existing graph first
+
+      document.getElementById("fullyVax").innerHTML = "";
+
+      let containerwidth = parseInt(d3.select("#fullyVax").style("width"));
+      let containerheight = parseInt(d3.select("#fullyVax").style("height"));
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let x = d3
+        .scaleTime()
+        .domain(
+          d3.extent(covidData, function(d) {
+            return d3.timeParse("%Y-%m-%d")(d.date);
+          })
+        )
+        .range([0, width]);
+
+      let y = d3
+        .scaleLog()
+        .clamp(true)
+        .domain([
+          1,
+          d3.max(covidData, function(d) {
+            return parseFloat(+d.people_fully_vaccinated);
+          })
+        ])
+        .range([height, 0])
+        .nice();
+
+      let Tooltip = d3
+        .select("#fullyVax")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      const graph = d3
+        .select("#fullyVax")
+        .on("mouseover", function() {
+          Tooltip.style("opacity", 1);
+        })
+        .on("mouseout", function() {
+          Tooltip.style("opacity", 0);
+        });
+
+      const svg = d3
+        .select("#fullyVax")
+        .append("svg")
+        .attr("class", "chart")
+        .attr("width", containerwidth)
+        .attr("height", containerheight);
+
+      let dataByDate = {};
+      for (let datum of covidData) {
+        const date = datum.date;
+        if (!(date in dataByDate)) {
+          dataByDate[date] = [];
+        }
+        dataByDate[date].push(datum);
+      }
+
+      const zPadTwo = function(s) {
+        return ("00" + s).slice(-2);
+      };
+      const formatDate = function(date) {
+        return (
+          date.getFullYear() +
+          "-" +
+          zPadTwo(date.getMonth() + 1) +
+          "-" +
+          zPadTwo(date.getDate())
+        );
+      };
+
+      function mousemove() {
+        const mouseX = d3.mouse(this)[0];
+        const mouseY = d3.mouse(this)[1];
+        let x0 = x.invert(d3.mouse(this)[0]);
+        let formattedDate = formatDate(x0);
+        let dataForToday = dataByDate[formattedDate];
+        let markup = "<b>" + formattedDate + "</b><br/>";
+        for (let i = 0; i < dataForToday.length; i++) {
+          const datum = dataForToday[i];
+          if (selectedCountryNames.includes(datum.location)) {
+            markup +=
+              "" +
+              datum.location +
+              ": <b>" +
+              datum.people_fully_vaccinated +
+              "</b><br>";
+          }
+        }
+        Tooltip.style("left", mouseX + margin.left + "px")
+          .style("top", mouseY + margin.top + "px")
+          .html(markup);
+      }
+
+      // draw chart
+      svg
+        .append("g")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll(".line-path")
+        .data(countries)
+        .enter()
+        .append("path")
+        .attr("class", "line-path")
+        .attr("fill", "none")
+        .attr("stroke", function(d) {
+          return color(d.key);
+        })
+        .attr("stroke-width", 1.5)
+        .style("display", function(d) {
+          if (selectedCountryNames.includes(d.key)) {
+            return "block";
+          } else {
+            return "none";
+          }
+        })
+        .attr("d", function(d) {
+          return d3
+            .line()
+            .x(function(d) {
+              return x(d3.timeParse("%Y-%m-%d")(d.date));
+            })
+            .y(function(d) {
+              return y(parseFloat(+d.people_fully_vaccinated));
+            })(d.values);
+        });
+
+      svg
+        .append("rect")
+        .attr("width", containerwidth - margin.left - margin.right)
+        .attr("height", containerheight - margin.top - margin.bottom)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mousemove", mousemove);
+
+      // creating label for x axis
+      svg
+        .append("text")
+        .attr("class", "x-label")
+        .attr("text-anchor", "middle")
+        .attr(
+          "transform",
+          "translate(" + width / 2 + " ," + (height + margin.bottom + 18) + ")"
+        )
+        .text("Date");
+
+      // Creating label for y axis
+      svg
+        .append("text")
+        .attr("class", "y-label")
+        .attr("y", 18)
+        .attr("x", -height / 2)
+        .attr("transform", "rotate(-90)")
+        .style("text-anchor", "middle")
+        .text("Fully Vaccinated Population");
+
+      // Adding x & y axes
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5));
+    }
+    // vaccines availability in countries
+
+    function drawVaccines() {
+      let vaccinesData = VACCINES;
+      const margin = { top: 20, right: 20, bottom: 30, left: 100 };
+
+      vaccinesData = vaccinesData.sort(function(a, b) {
+        return d3.ascending(a.countries, b.countries);
+      });
+
+      document.getElementById("vaccines").innerHTML = "";
+
+      let containerwidth = parseInt(d3.select("#vaccines").style("width"));
+      let containerheight = parseInt(d3.select("#vaccines").style("height"));
+      let width = containerwidth - margin.left - margin.right;
+      let height = containerheight - margin.top - margin.bottom;
+
+      let Tooltip = d3
+        .select("#vaccines")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px");
+
+      let mouseover = function(d) {
+        Tooltip.style("opacity", 1);
+        d3.select(this)
+          .style("stroke", "black")
+          .style("opacity", 1);
+      };
+
+      let mousemove = function(d) {
+        Tooltip.html(d.make + "<br>" + d.countries)
+          .style("left", d3.mouse(this)[0] + "px")
+          .style("top", d3.mouse(this)[1] + 50 + "px");
+      };
+
+      let mouseleave = function(d) {
+        Tooltip.style("opacity", 0);
+        d3.select(this)
+          .style("stroke", "none")
+          .style("opacity", 0.8);
+      };
+
+      let x = d3
+        .scaleLinear()
+        .domain([
+          0,
+          d3.max(vaccinesData, function(d) {
+            return d.countries;
+          })
+        ])
+        .range([0, width]);
+
+      let y = d3
+        .scaleBand()
+        .domain(
+          vaccinesData.map(function(d) {
+            return d.make;
+          })
+        )
+        .range([height, 0])
+        .padding(0.1);
+
+      let svg = d3
+        .select("#vaccines")
+        .append("svg")
+        .attr("width", containerwidth)
+        .attr("height", containerheight);
+
+      svg
+        .append("g")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .selectAll(".bar")
+        .data(vaccinesData)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("fill", "steelblue")
+        .attr("stroke-width", 2)
+        .attr("width", function(d) {
+          return x(d.countries);
+        })
+        .attr("y", function(d) {
+          return y(d.make);
+        })
+        .attr("height", y.bandwidth())
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave);
+
+      svg
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(d3.axisLeft(y));
+
+      svg
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + margin.left + "," + (margin.top + height) + ")"
+        )
+        .call(d3.axisBottom(x).ticks(5));
+    }
+  </script>
+</body>
